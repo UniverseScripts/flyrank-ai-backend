@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, status
 from json import load
 from pydantic import BaseModel
+from typing import Optional
 import os
 
 with open(os.path.join(os.path.dirname(__file__), 'mock_data.json'), 'r') as f:
@@ -27,11 +28,20 @@ async def get_task(id: int):
             return task
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {id} not found")
 
+class Task(BaseModel):
+    id: int
+    title: str
+    done: bool
+
 class TaskCreate(BaseModel):
     title: str
 
-@app.post('/tasks')
-async def create_task(task: TaskCreate, status_code: int = status.HTTP_201_CREATED):
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    done: Optional[bool] = None
+
+@app.post('/tasks', response_model=Task, status_code=status.HTTP_201_CREATED)
+async def create_task(task: TaskCreate):
     new_task = {
         "id": len(data["tasks"]) + 1,
         "title": task.title,
@@ -39,6 +49,25 @@ async def create_task(task: TaskCreate, status_code: int = status.HTTP_201_CREAT
     }
     data["tasks"].append(new_task)
     return {"task": new_task }
+
+@app.put('/tasks/{id}', response_model=Task, status_code=status.HTTP_202_ACCEPTED)
+async def update_task(id: int, payload: TaskUpdate):
+    for task in data["tasks"]:
+        if task["id"] == id:
+            if payload.title:
+                task["title"] = payload.title
+            if payload.done is not None:
+                task["done"] = payload.done
+            return {"task": task }
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {id} not found")
+
+@app.delete('/tasks/{id}', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(id: int):
+    for task in data["tasks"]:
+        if task["id"] == id:
+            data["tasks"].remove(task)
+            return {"task": task }
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {id} not found")
 
 if __name__ == "__main__":
     import uvicorn
