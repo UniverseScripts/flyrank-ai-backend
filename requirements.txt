@@ -1,2 +1,6 @@
 fastapi[standard]
 python-dotenv
+sqlalchemy
+asyncpg
+pydantic
+pydantic-settings
