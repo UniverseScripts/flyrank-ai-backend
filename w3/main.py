@@ -67,3 +67,34 @@ async def create_task(task: TaskCreate, db: AsyncSession = Depends(get_db)):
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@app.put("/tasks/{id}")
+async def update_task(id: int, task: TaskCreate, db: AsyncSession = Depends(get_db)):
+    try:
+        stmt = select(Task).where(Task.id == id)
+        result = await db.execute(stmt)
+        new_task = result.scalar_one_or_none()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+    if new_task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    new_task.title = task.title
+    new_task.done = task.done
+    await db.commit()
+    await db.refresh(new_task)
+    return {"message": "Task updated successfully", "task": new_task}
+
+@app.delete("/tasks/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        stmt = select(Task).where(Task.id == id)
+        result = await db.execute(stmt)
+        task = result.scalar_one_or_none()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    await db.delete(task)
+    await db.commit()
