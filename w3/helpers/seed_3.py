@@ -1,5 +1,5 @@
-from w3.db_engine import AsyncLocalSession
 from sqlalchemy import select
+from w3.db_engine import AsyncLocalSession
 from w3.db_models.tasks import Task
 
 
@@ -23,4 +23,4 @@ async def seed_3_examples():
             return "Successfully inserted 3 tasks"
         except Exception as e:
             await db.rollback()
-            return "Task failed to seed"
+            return f"Task failed to seed: {e}"

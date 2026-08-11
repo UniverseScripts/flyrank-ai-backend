@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# Add project root to sys.path to enable both script (uv run w3/main.py) and module (uvicorn w3.main:app) execution
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
@@ -27,7 +33,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Flyrank AI - Week 3 Task API",
-    description="Database-backed CRUD Task API with SQLite and SQLAlchemy",
+    description="Database-backed CRUD Task API with SQLite/Postgres and SQLAlchemy",
     version="1.0.0",
     lifespan=lifespan,
 )
