@@ -43,7 +43,7 @@ app = FastAPI(
 async def health_check():
     return {"status": "ok"}
 
-
+# A3 - Stage 2
 @app.get("/tasks", response_model=List[TaskResponse], summary="Get all tasks with optional search/filter/sort")
 async def get_tasks(
     search: Optional[str] = Query(None, description="Search term matching title"),
