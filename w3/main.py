@@ -93,7 +93,7 @@ async def get_task(id: int, db: AsyncSession = Depends(get_db)):
         )
     return task
 
-
+# A3 - Stage 3
 @app.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED, summary="Create a new task")
 async def create_task(task: TaskCreate, db: AsyncSession = Depends(get_db)):
     try:
