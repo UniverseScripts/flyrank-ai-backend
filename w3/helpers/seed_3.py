@@ -1,6 +1,6 @@
 from sqlalchemy import select
-from w3.db_engine import AsyncLocalSession
-from w3.db_models.tasks import Task
+from db_engine import AsyncLocalSession
+from db_models.tasks import Task
 
 
 async def seed_3_examples():

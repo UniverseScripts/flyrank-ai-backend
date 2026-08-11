@@ -1,9 +1,6 @@
 import sys
 from pathlib import Path
 
-# Add project root to sys.path to enable both script (uv run w3/main.py) and module (uvicorn w3.main:app) execution
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
@@ -11,10 +8,10 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from w3.db_engine import create_tables, engine, get_db
-from w3.db_models import Task
-from w3.helpers.seed_3 import seed_3_examples
-from w3.schemas.tasks import TaskCreate, TaskResponse, TaskStats, TaskUpdate
+from db_engine import create_tables, engine, get_db
+from db_models import Task
+from helpers.seed_3 import seed_3_examples
+from schemas.tasks import TaskCreate, TaskResponse, TaskStats, TaskUpdate
 
 
 @asynccontextmanager
@@ -207,4 +204,4 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("w3.main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

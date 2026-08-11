@@ -1,0 +1,10 @@
+fastapi[standard]
+python-dotenv
+sqlalchemy
+asyncpg
+aiosqlite
+pydantic
+pydantic-settings
+pytest
+pytest-asyncio
+httpx
