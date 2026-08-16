@@ -1,0 +1,11 @@
+fastapi[standard]
+python-dotenv
+sqlalchemy
+asyncpg
+psycopg2
+aiosqlite
+pydantic
+pydantic-settings
+pytest
+pytest-asyncio
+httpx
