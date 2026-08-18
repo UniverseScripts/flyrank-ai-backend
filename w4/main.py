@@ -78,20 +78,19 @@ async def public_info():
     }
 
 @app.get("/protected/profile", status_code=status.HTTP_200_OK)
-async def profile(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer"):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Access token required")
-    
-    token = authorization.split(" ")[1].strip()
-    if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Access token required")
+async def profile(user = Depends(get_user)):
+    return user
 
-    user = await get_user(token)
+@app.get("/protected/dashboard", status_code=status.HTTP_200_OK)
+async def dashboard(user = Depends(get_user)):
     return {
-        "message": "Access token received",
-        "user": user,
+        "message": f"Welcome to dashboard. {user.email}!",
+        "user_id": user.id
     }
-    
+
+@app.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(user = Depends(get_user), supabase: AsyncClient = Depends(get_supabase_client)):
+    await supabase.auth.sign_out()
 
 if __name__ == "__main__":
     import uvicorn
