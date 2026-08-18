@@ -25,8 +25,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Flyrank AI - Week 3 Task API",
-    description="Database-backed CRUD Task API with Supabase Authentication",
+    title="Flyrank AI - Week 4 Task API",
+    description="Authentication and Middleware with Supabase",
     version="1.0.0",
     lifespan=lifespan,
 )
