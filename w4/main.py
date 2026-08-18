@@ -4,7 +4,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Response, status, Header
 from supabase import acreate_client, AsyncClient
 
 from db_engine import create_tables, engine, get_db
@@ -70,6 +70,26 @@ async def login(user: UserLogin, supabase: AsyncClient = Depends(get_supabase_cl
         }
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    
+@app.get("/public/info", status_code=status.HTTP_200_OK)
+async def public_info():
+    return {
+        "message": "Welcome stranger! This info is public.",
+    }
+
+@app.get("/protected/profile", status_code=status.HTTP_200_OK)
+async def profile(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Access token required")
+    
+    token = authorization.split(" ")[1].strip()
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Access token required")
+
+    return {
+        "message": "Access token received",
+        "token": token
+    }
     
 
 if __name__ == "__main__":
