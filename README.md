@@ -4,7 +4,7 @@
 
 ## Week 2 (Assignment A1) - In-Memory CRUD API
 
-![SwaggerUI docs fastapi](static/image.png)
+![SwaggerUI docs fastapi](static/w1.png)
 
 ### Setup (Week 2)
 1. Clone the repository:
@@ -91,7 +91,7 @@ To stop the stack:
 docker compose down
 ```
 
-### Environment Variables & Configuration
+### Environment Variables & Configuration (A3)
 
 Configuration is managed via `.env` (git-ignored). A template is provided in [`.env.example`](.env.example):
 
@@ -105,7 +105,7 @@ cp .env.example .env
 uv run w3/main.py
 ```
 
-### API Endpoints
+### API Endpoints (A3)
 
 | Method | Endpoint | Description | Status Code |
 |---|---|---|---|
@@ -117,74 +117,121 @@ uv run w3/main.py
 | `DELETE` | `/tasks/{id}` | Delete a task | `204 No Content` / `404 Not Found` |
 | `GET` | `/stats` | Aggregated task metrics (`total`, `completed`, `pending`) | `200 OK` |
 
-### Sample Request & Response (`curl -i`)
+---
 
-#### Create Task (`POST /tasks`)
-```bash
-curl -i -X POST "http://localhost:8000/tasks" \
-  -H "Content-Type: application/json" \
-  -d "{\"title\": \"Deploy Container Stack\", \"done\": false}"
+## Week 4 (Assignment A4) - Auth · Login & Protect (Supabase Auth & JWT Middleware)
+
+![Swagger UI Bearer Auth](static/w4.png)
+
+### Overview
+Integrates **Supabase Auth** as the external Identity Provider (IdP). Implements full user authentication lifecycles (Signup, Login, Logout), cryptographic JWT bearer token verification via FastAPI dependencies, and interactive Swagger UI documentation with bearer authorization padlocks.
+
+### Environment Setup (A4)
+Create a `.env` file in `w4/` based on [`w4/.env.example`](w4/.env.example):
+
+```env
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
+PORT=8000
 ```
 
-**Response Output:**
+> [!CAUTION]
+> Never commit `.env` or use the `service_role` key in client configurations. Only use the public `anon` key.
+
+### Startup Command
+Run the application directly using `uv`:
+```bash
+uv run w4/main.py
+```
+- API Base URL: `http://localhost:8000`
+- Interactive Swagger UI: `http://localhost:8000/docs`
+
+---
+
+### API Endpoints & Auth Matrix (A4)
+
+| Method | Endpoint | Description | Auth Required | Status Code |
+|---|---|---|---|---|
+| `POST` | `/auth/signup` | Register a new user account | No | `201 Created` / `400 Bad Request` |
+| `POST` | `/auth/login` | Authenticate credentials and receive JWT | No | `200 OK` / `401 Unauthorized` |
+| `POST` | `/auth/logout` | Terminate user session | Yes (`Bearer <token>`) | `204 No Content` / `401 Unauthorized` |
+| `GET` | `/public/info` | Public open endpoint | No | `200 OK` |
+| `GET` | `/protected/profile` | Retrieve verified user metadata | Yes (`Bearer <token>`) | `200 OK` / `401 Unauthorized` |
+| `GET` | `/protected/dashboard`| Reusable guard verification route | Yes (`Bearer <token>`) | `200 OK` / `401 Unauthorized` |
+
+---
+
+### End-to-End Authentication Flow (`curl -i`)
+
+#### 1. Sign Up (`POST /auth/signup`)
+```bash
+curl -i -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"developer@example.com\",\"password\":\"securepass123\"}"
+```
+**Response:**
 ```http
 HTTP/1.1 201 Created
-date: Tue, 11 Aug 2026 09:37:00 GMT
-server: uvicorn
-content-length: 53
 content-type: application/json
 
-{"id":4,"title":"Deploy Container Stack","done":false}
+{"id":"d954e7d1-cf1b-4f9e-a02b-e7b8972e391a","email":"developer@example.com","created_at":"2026-08-18T10:00:00Z"}
 ```
 
-#### Retrieve Tasks (`GET /tasks`)
+#### 2. Log In (`POST /auth/login`)
 ```bash
-curl -i "http://localhost:8000/tasks"
+curl -i -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"developer@example.com\",\"password\":\"securepass123\"}"
 ```
-
-**Response Output:**
+**Response:**
 ```http
 HTTP/1.1 200 OK
-date: Tue, 11 Aug 2026 09:37:05 GMT
-server: uvicorn
-content-length: 172
 content-type: application/json
 
-[
-  {"id":1,"title":"Task 1","done":false},
-  {"id":2,"title":"Task 2","done":false},
-  {"id":3,"title":"Task 3","done":false},
-  {"id":4,"title":"Deploy Container Stack","done":false}
-]
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "v0_refresh_token_string...",
+  "token_type": "bearer",
+  "user": {"id":"d954e7d1-cf1b-4f9e-a02b-e7b8972e391a","email":"developer@example.com"}
+}
 ```
 
-### Database Verification (`psql`)
-
+#### 3. Access Protected Route with Bearer Token (`GET /protected/profile`)
 ```bash
-docker exec -it w3-db-1 psql -U postgres -d tasks
+curl -i http://localhost:8000/protected/profile \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```http
+HTTP/1.1 200 OK
+content-type: application/json
+
+{
+  "id": "d954e7d1-cf1b-4f9e-a02b-e7b8972e391a",
+  "email": "developer@example.com",
+  "role": "authenticated"
+}
 ```
 
-```sql
-tasks=# \dt
-         List of relations
- Schema | Name  | Type  |  Owner   
---------+-------+-------+----------
- public | tasks | table | postgres
-(1 row)
-
-tasks=# SELECT * FROM tasks;
- id |          title          | done 
-----+-------------------------+------
-  1 | Task 1                  | f
-  2 | Task 2                  | f
-  3 | Task 3                  | f
-  4 | Deploy Container Stack  | f
-(4 rows)
-
-tasks=# \q
-```
-
-### Running Automated Tests
+#### 4. Access Protected Route with Forged/Tampered Token
 ```bash
-uv run pytest -v
+curl -i http://localhost:8000/protected/profile \
+  -H "Authorization: Bearer invalid_or_tampered_token"
+```
+**Response:**
+```http
+HTTP/1.1 401 Unauthorized
+content-type: application/json
+
+{"detail":"Invalid or expired token"}
+```
+
+#### 5. Log Out (`POST /auth/logout`)
+```bash
+curl -i -X POST http://localhost:8000/auth/logout \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+**Response:**
+```http
+HTTP/1.1 204 No Content
 ```
