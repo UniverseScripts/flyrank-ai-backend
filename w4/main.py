@@ -10,7 +10,7 @@ from supabase import acreate_client, AsyncClient
 from db_engine import create_tables, engine, get_db
 from schemas.auth import UserLogin, UserSignUp
 from config import settings
-from helpers import get_user
+from helpers.get_user import get_user
 
 
 @asynccontextmanager
@@ -86,9 +86,10 @@ async def profile(authorization: Optional[str] = Header(None)):
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Access token required")
 
+    user = await get_user(token)
     return {
         "message": "Access token received",
-        "token": token
+        "user": user,
     }
     
 
