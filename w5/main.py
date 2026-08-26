@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from schema.books import Books
+from schema.run_reports import RunReports
 
 IDENTITY = "FlyRankInternship-A9/1.0 (https://github.com/UniverseScripts/flyrank-ai-backend)"
 HEADERS = {"User-Agent": IDENTITY}
@@ -18,17 +19,18 @@ CACHE_FILE = "w5/cache/catalogue-page-1.html"
 TARGET_URL = "https://books.toscrape.com/catalogue/page-1.html"
 
 BASE_URL = "https://books.toscrape.com"
+RETRY_LIMIT = 1
 
-def fetch_and_save_page(url: str, method: str = "GET", headers: dict = None, cache_file: str = None, delay: float = 0.5) -> BeautifulSoup:
+def fetch_and_save_page(url: str, method: str = "GET", headers: dict = None, cache_file: str = None, delay: float = 0.5) -> dict:
     if cache_file and os.path.exists(cache_file):
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
                 content = f.read()
                 print(f"CACHE HIT: {cache_file} ({len(content.encode('utf-8'))} bytes)")
-                return BeautifulSoup(content, "html.parser")
+                return { "soup": BeautifulSoup(content, "html.parser") , "cache_hits": True}
         except Exception as e:
             print(f"Error: {e}")
-            return None
+            return { "soup": None , "cache_hits": False}
 
     time.sleep(delay)
 
@@ -36,16 +38,16 @@ def fetch_and_save_page(url: str, method: str = "GET", headers: dict = None, cac
         page = request(method=method, url=url, headers=headers, timeout=5.0)
         if page.status_code != 200:
             print(f"Fetch failed with status code: {page.status_code}")
-            return None
+            return { "soup": None , "cache_hits": False}
 
         content = page.text
         if cache_file:
             save_page(content=content, filename=cache_file)
             print(f"FETCH: {url} -> {cache_file} ({len(content.encode('utf-8'))} bytes)")
-        return BeautifulSoup(content, "html.parser")
+        return { "soup": BeautifulSoup(content, "html.parser") , "cache_hits": False}
     except Exception as e:
         print(f"Error: {e}")
-        return None
+        return { "soup": None , "cache_hits": False}
 
 
 def save_page(filename: str, content: str) -> None:
@@ -123,14 +125,30 @@ def get_multiple_categories(start_url: str, max_pages: int = 5, in_detail: bool 
     discovered_books = []
     book_details = []
     pages_crawled = 0
+    failed_pages = 0
+    invalid_records = 0
+    retries = 0
+    cache_hits = 0
 
     for page_num in range(1, max_pages + 1):
         cache_path = f"w5/cache/catalogue-page-{page_num}.html"
 
-        page_soup = fetch_and_save_page(url=current_url, headers=HEADERS, cache_file=cache_path)
+        page = fetch_and_save_page(url=current_url, headers=HEADERS, cache_file=cache_path)
+
+        if page["cache_hits"]:
+            cache_hits += 1
+
+        page_soup = page["soup"]
 
         if not page_soup:
-            print(f"Failed to fetch page {page_num}")
+            while retries <= RETRY_LIMIT:
+                print(f"Failed to fetch page {page_num}. Retrying {retries}/{RETRY_LIMIT}...")
+                retries += 1
+                page_soup = fetch_and_save_page(url=current_url, headers=HEADERS, cache_file=cache_path)["soup"]
+                if page_soup:
+                    break
+            failed_pages += 1
+            print(f"Failed to fetch page {page_num}. Skipping...")
             break
         
         pages_crawled += 1
@@ -144,10 +162,15 @@ def get_multiple_categories(start_url: str, max_pages: int = 5, in_detail: bool 
                 if in_detail:
                     slug = link.split("/")[-2]
                     book_cache_file = f"w5/cache/{slug}.html"
-                    book_soup = fetch_and_save_page(url=link, headers=HEADERS, cache_file=book_cache_file)
+                    book_soup = fetch_and_save_page(url=link, headers=HEADERS, cache_file=book_cache_file)["soup"]
                     if book_soup:
                         record = extract_book_detail(soup=book_soup, product_url=link, source_page=current_url)
-                    book_details.append(record)
+                        if record:
+                            book_details.append(record)
+                        else:
+                            invalid_records += 1
+                    else:
+                        failed_pages += 1
                 discovered_books.append(link)
             
         if page_num < max_pages:
@@ -159,7 +182,47 @@ def get_multiple_categories(start_url: str, max_pages: int = 5, in_detail: bool 
     
     unique_books = list(dict.fromkeys(discovered_books))
     print(f"catalogue_pages={pages_crawled} , discovered={len(unique_books)} , book_details={len(book_details)}")
-    return book_details
+
+    telemetry = {
+        "book_details": book_details,
+        "pages_crawled": pages_crawled,
+        "discovered_books": len(unique_books),
+        "cache_hits": cache_hits,
+        "valid_records": len(book_details),
+        "invalid_records": invalid_records,
+        "failed_pages": failed_pages
+    }
+    return telemetry
+
+def runner():
+
+    start_time = datetime.now(timezone.utc)
+
+    records = get_multiple_categories(start_url=TARGET_URL, max_pages=3, in_detail=True)
+
+    duration = datetime.now(timezone.utc)- start_time
+
+    save_page("w5/output/books.json", json.dumps(records["book_details"], indent=2))
+    
+    try:
+        validate = RunReports(
+            start_time=start_time,
+            duration=duration,
+            pages_crawled=records["pages_crawled"],
+            discovered_books=records["discovered_books"],
+            cache_hits=records["cache_hits"],
+            valid_records=records["valid_records"],
+            invalid_records=records["invalid_records"],
+            failed_pages=records["failed_pages"]
+        )
+        return validate.model_dump(mode="json")
+    except ValidationError as e:
+        print(f"Validation Error: {e}")
+        return None
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
 
 if __name__ == "__main__":
     # page = fetch_and_save_page(url=TARGET_URL, headers=HEADERS, cache_file=CACHE_FILE)
@@ -168,7 +231,7 @@ if __name__ == "__main__":
 
     # categories_page_soup = fetch_and_save_page(url=BASE_URL, headers=HEADERS, cache_file="w5/cache/all-categories.html")
     
-    records = get_multiple_categories(start_url=TARGET_URL, max_pages=3, in_detail=True)
+    run_report = runner()
     
-    save_page("w5/output/books.json", json.dumps(records, indent=2))
-    print(f"✅ Successfully saved {len(records)} records to w5/output/books.json")
+    save_page("w5/output/run-report.json", json.dumps(run_report, indent=2))
+    print("Successfully saved to w5/output/run-report.json")
