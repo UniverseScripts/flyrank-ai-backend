@@ -235,3 +235,79 @@ curl -i -X POST http://localhost:8000/auth/logout \
 ```http
 HTTP/1.1 204 No Content
 ```
+
+---
+
+## Week 5 (Assignment A9) - The Polite Scraper (Pipeline, Normalization & Telemetry)
+
+### Overview
+A deterministic, respectful web scraping pipeline that traverses the first 3 catalogue pages of the *Books to Scrape* sandbox, discovers all 60 book detail pages, extracts messy HTML into clean data, strictly validates records against a Pydantic schema, and outputs idempotent datasets with full execution telemetry.
+
+### Target Classification (Stage 0)
+- **Target Site**: Books to Scrape (`https://books.toscrape.com/`)
+- **Purpose**: Public practice sandbox built explicitly for testing and learning web scrapers.
+- **Scope**: Exactly the first 3 catalogue pages (60 book records total).
+- **Data Collected**: Book title, canonical product URL, raw price text, normalized numeric price in GBP (`price_gbp`), stock availability, star rating, product description (null when omitted), source page URL, and extraction timestamp.
+- **robots.txt Check**: `https://books.toscrape.com/robots.txt` returned HTTP 404 ("no robots file found").
+- **Appropriateness**: The target site is explicitly a non-commercial, purpose-built scraping sandbox.
+- **Compliance Declaration**: *"I will not reuse this code on another site without checking its rules and terms first."*
+
+### One-Command Quickstart
+```bash
+uv run w5/main.py
+```
+
+### Installation (Python Lane)
+- **Python**: 3.10+
+- **Dependencies**: Requests, Beautiful Soup 4, Pydantic v2
+```bash
+uv pip install -r w5/requirements.txt
+```
+
+### Politeness Rules & Engineering Standards
+1. **User-Agent**: Honest identification header sent on every request (`FlyRankInternship-A9/1.0 (+https://github.com/UniverseScripts/flyrank-ai-backend)`).
+2. **Rate Limiting**: Enforced $\ge 500\text{ ms}$ delay between live network requests.
+3. **Timeout Guard**: Strict $5.0\text{s}$ timeout on all HTTP requests to prevent hangs.
+4. **Local Caching**: Raw HTML is cached to `w5/cache/*.html`. Development and reruns read from local disk rather than hammering the remote host.
+5. **Fault Isolation**: Per-page exception handling. A single broken/malformed page is logged, skipped, and reported without crashing the pipeline.
+6. **No-Browser Rationale**: The data is already present in the server-rendered HTML response; spinning up a headless browser (Playwright/Puppeteer) would only introduce unnecessary compute cost, latency, and memory bloat.
+
+### Record Schema (Pydantic)
+
+| Field | Type | Description | Required |
+|---|---|---|---|
+| `title` | `str` | Book title extracted from product main header | Yes |
+| `product_url` | `str` | Absolute canonical URL of the book page | Yes |
+| `price_text` | `str` | Raw price string as displayed (e.g. `£51.77`) | Yes |
+| `price_gbp` | `float` | Normalized numeric price in GBP (e.g. `51.77`) | Yes |
+| `availability_text` | `str` | Stock status and quantity text | Yes |
+| `rating_text` | `str` | Star rating text (e.g. `One`, `Two`, `Three`) | Yes |
+| `description` | `str \| null` | Product description text (`null` if absent on page) | No |
+| `source_page` | `str` | Catalogue page where the book link was discovered | Yes |
+| `fetched_at` | `str` (ISO-8601) | Timestamp of when the record was extracted | Yes |
+
+### Telemetry Evidence (`w5/output/run-report.json`)
+
+```json
+{
+  "start_time": "2026-08-26T12:45:11.201920Z",
+  "duration": "PT0.384465S",
+  "pages_crawled": 3,
+  "discovered_books": 60,
+  "cache_hits": 3,
+  "valid_records": 60,
+  "invalid_records": 0,
+  "failed_pages": 0
+}
+```
+
+### Honest Limitation
+The crawler relies on deterministic CSS selectors on server-rendered HTML and assumes standard HTML pagination (`li.next a`). It does not execute client-side JavaScript (SPAs) or handle dynamic infinite-scroll pagination.
+
+### Ethics Statement
+Always verify `robots.txt` and terms of service before collecting data. Prefer official REST or GraphQL APIs whenever available. Never bypass authentication barriers, paywalls, or rate limiters, and collect strictly the minimum required dataset.
+
+### Running Edge Case Tests
+```bash
+uv run python w5/test_edge_cases.py
+```

@@ -6,3 +6,6 @@
 *.db
 **/*.db
 *cache
+**/*cache*
+w5/cache/
+**/cache/**
