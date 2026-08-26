@@ -3,9 +3,13 @@ import time
 import re
 import json
 from bs4 import BeautifulSoup
+from typing import Optional
 from requests import request
 from urllib.parse import urljoin
 from datetime import datetime, timezone
+from pydantic import ValidationError
+
+from schema.books import Books
 
 IDENTITY = "FlyRankInternship-A9/1.0 (https://github.com/UniverseScripts/flyrank-ai-backend)"
 HEADERS = {"User-Agent": IDENTITY}
@@ -36,7 +40,7 @@ def fetch_and_save_page(url: str, method: str = "GET", headers: dict = None, cac
 
         content = page.text
         if cache_file:
-            save_page(page=content, filename=cache_file)
+            save_page(content=content, filename=cache_file)
             print(f"FETCH: {url} -> {cache_file} ({len(content.encode('utf-8'))} bytes)")
         return BeautifulSoup(content, "html.parser")
     except Exception as e:
@@ -44,9 +48,9 @@ def fetch_and_save_page(url: str, method: str = "GET", headers: dict = None, cac
         return None
 
 
-def save_page(page: BeautifulSoup, filename: str) -> None:
-    if not page:
-        print("No page to save\n")
+def save_page(filename: str, content: str) -> None:
+    if not content:
+        print("No page or content to save\n")
         return
 
     if not os.path.exists(filename):
@@ -57,7 +61,7 @@ def save_page(page: BeautifulSoup, filename: str) -> None:
             return
     try:
         with open(filename, "w", encoding="utf-8") as f:
-            f.write(page)
+            f.write(content)
     except Exception as e:
         print(f"Error: {e}")
 
@@ -74,6 +78,7 @@ def extract_book_detail(soup: BeautifulSoup, product_url: str, source_page: str)
     # Price
     price_el = product_main.select_one("p.price_color")
     price_text = price_el.get_text(strip=True) if price_el else ""
+    price_gbp = float(re.sub(r'[^\d.]', '', price_text))
 
     # Availability
     avail_el = product_main.select_one("p.instock.availability")
@@ -91,16 +96,26 @@ def extract_book_detail(soup: BeautifulSoup, product_url: str, source_page: str)
         description = desc_p.get_text(strip=True) if desc_p else None
     else:
         description = None
-    return {
-        "title": title,
-        "product_url": product_url,
-        "price_text": price_text,
-        "availability_text": availability_text,
-        "rating_text": rating_text,
-        "description": description,
-        "source_page": source_page,
-        "fetched_at": datetime.now(timezone.utc).isoformat()
-    }
+
+    try:
+        validate = Books(
+            title=title,
+            product_url=product_url,
+            price_text=price_text,
+            price_gbp=price_gbp,
+            availability_text=availability_text,
+            rating_text=rating_text,
+            description=description,
+            source_page=source_page,
+            fetched_at=datetime.now(timezone.utc).isoformat()
+        )
+        return validate.model_dump(mode="json")
+    except ValidationError as e:
+        print(f"Validation Error for {product_url}\n{e}")
+        return None
+    except Exception as e:
+        print(f"Error for {product_url}: {e}")
+        return None
 
 
 def get_multiple_categories(start_url: str, max_pages: int = 5, in_detail: bool = False) -> list[str]:
@@ -151,10 +166,9 @@ if __name__ == "__main__":
     # if not page:
     #     print("No page fetched")
 
-    categories_page_soup = fetch_and_save_page(url=BASE_URL, headers=HEADERS, cache_file="w5/cache/all-categories.html")
+    # categories_page_soup = fetch_and_save_page(url=BASE_URL, headers=HEADERS, cache_file="w5/cache/all-categories.html")
     
     records = get_multiple_categories(start_url=TARGET_URL, max_pages=3, in_detail=True)
-    if records:
-        print("\n--- Sample Raw Record (Stage 3 Checkpoint) ---")
-        print(json.dumps(records[0], indent=2))
-        print(f"\ndetail_pages={len(records)}")
+    
+    save_page("w5/output/books.json", json.dumps(records, indent=2))
+    print(f"✅ Successfully saved {len(records)} records to w5/output/books.json")
