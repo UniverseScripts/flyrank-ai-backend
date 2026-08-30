@@ -1,11 +1,5 @@
-import sys
-from pathlib import Path
-
-# Add w7 folder to sys.path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from openai import OpenAI
-from config import settings
+from w7.config import settings
 
 
 client = OpenAI(
