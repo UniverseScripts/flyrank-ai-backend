@@ -10,6 +10,7 @@ from w7.src.schemas import (
     ClassifySupportMessageRequest,
     ClassifySupportMessageResponse,
 )
+from w7.src.helpers import write_log
 
 VERSION = "1.0.0"
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "support_classifier_v1.md"
@@ -25,12 +26,12 @@ client = OpenAI(base_url=settings.LLM_BASE_URL, api_key=settings.LLM_API_KEY)
 
 
 @app.get("/health")
-def health_check():
+async def health_check():
     return {"status": "ok", "version": VERSION}
 
 
 @app.get("/model-health")
-def model_health_check():
+async def model_health_check():
     try:
         client.models.list()
         return {"status": "ok", "version": VERSION}
@@ -40,7 +41,7 @@ def model_health_check():
         )
 
 @app.post("/v1/classify-support-message", response_model=ClassifySupportMessageResponse)
-def classify_support_message(request: ClassifySupportMessageRequest):
+async def classify_support_message(request: ClassifySupportMessageRequest):
     if os.getenv("LLM_STUB") == "1":
         return ClassifySupportMessageResponse(
             category="billing",
@@ -86,13 +87,41 @@ def classify_support_message(request: ClassifySupportMessageRequest):
                 response_json = json.loads(raw_content)
                 return ClassifySupportMessageResponse.model_validate(response_json)
             except (json.JSONDecodeError, Exception) as parse_err:
-                # Fallback for malformed JSON
-                return ClassifySupportMessageResponse(
+                # Retry one more time
+                malformed = ClassifySupportMessageResponse(
                     category="other",
                     urgency="low",
                     confidence=0.0,
                     reason=f"Failed to parse LLM response as JSON: {parse_err}"
                 )
+
+                try:
+                    retry_messages = [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": request.text},
+                        {"role": "assistant", "content": raw_content},
+                        {"role": "user", "content": "Your previous answer was rejected for this reason. Return only corrected JSON matching the schema."}
+                    ]
+
+                    retry_response = client.chat.completions.create(
+                        model=settings.LLM_MODEL,
+                        messages=retry_messages,
+                        temperature=0.2,
+                        response_format={"type": "json_object"},
+                    )
+                    retry_raw_content = retry_response.choices[0].message.content.strip()
+                    retry_match = re.search(r"\{.*\}", retry_raw_content, re.DOTALL)
+                    if retry_match:
+                        retry_raw_content = retry_match.group(0)
+                    
+                    retry_response_json = json.loads(retry_raw_content)
+                    return ClassifySupportMessageResponse.model_validate(retry_response_json)
+                except Exception:
+                    await write_log(request.text, malformed)
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(parse_err)
+                    )
+
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)
