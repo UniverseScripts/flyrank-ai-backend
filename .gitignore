@@ -9,3 +9,4 @@
 **/*cache*
 w5/cache/
 **/cache/**
+reports.db

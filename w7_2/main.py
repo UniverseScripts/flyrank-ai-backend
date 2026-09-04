@@ -1,12 +1,23 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from playwright.async_api import async_playwright
+from db.config import create_tables
+from db.config import dispose_engine
+from db.config import get_db_session
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Server Starting...")
+
+    await create_tables()
     
+    print("Databases created")
+
+    print("Server is online!")
+
     yield
+
+    await dispose_engine()
     
     print("Server Stopped...")
 
