@@ -1,9 +1,9 @@
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from pathlib import Path
 
 # Write a function that builds an HTML page (a template string is fine) from your report object: a title with today's
 # date, the two totals, a small table for the top 5, and a long table at the bottom — all orders, or all 60 books 
-def render_pdf_report(data: dict):
+async def render_pdf_report(data: dict, report_id: int | str = "test"):
     date = data['date']
     total_books = data.get('total_books', len(data['all_books']))
     average_price = data.get('average_price', 0.0)
@@ -73,30 +73,12 @@ def render_pdf_report(data: dict):
     </html>
     """
 
-    Path("reports").mkdir(exist_ok=True)
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.set_content(pdf_html)
-        page.pdf(path="reports/test.pdf", format="A4", print_background=True)
-        browser.close()
-
-if __name__ == "__main__":
-    import sqlite3
-
-    db_path = Path(__file__).parent / "report.db"
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    all_rows = c.execute("SELECT title, price FROM books").fetchall()
-    top_5_rows = c.execute("SELECT title, price FROM books ORDER BY price DESC LIMIT 5").fetchall()
-    avg_price = c.execute("SELECT AVG(price) FROM books").fetchone()[0]
-
-    data = {
-        "date": "2026-09-05",
-        "total_books": len(all_rows),
-        "average_price": round(avg_price, 2),
-        "top_5_books": [{"title": r[0], "price": f"£{r[1]:.2f}"} for r in top_5_rows],
-        "all_books": [{"title": r[0], "price": f"£{r[1]:.2f}"} for r in all_rows]
-    }
-    render_pdf_report(data)
-    print("PDF generated successfully")
+    reports_dir = Path(__file__).resolve().parent / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    file_path = reports_dir / f"{report_id}.pdf"
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.set_content(pdf_html)
+        await page.pdf(path=file_path, format="A4", print_background=True)
+        await browser.close()

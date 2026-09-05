@@ -10,7 +10,8 @@ if str(W7_2_DIR) not in sys.path:
 from render_pdf import render_pdf_report
 
 
-def test_render_pdf_report_generates_multipage_pdf():
+@pytest.mark.asyncio
+async def test_render_pdf_report_generates_multipage_pdf():
     # Provide 60 books in dataset
     data = {
         "date": "2026-09-05",
@@ -21,7 +22,7 @@ def test_render_pdf_report_generates_multipage_pdf():
     }
 
     # Execute PDF generation
-    render_pdf_report(data)
+    await render_pdf_report(data)
 
     pdf_path = W7_2_DIR / "reports" / "test.pdf"
     assert pdf_path.exists(), "Expected reports/test.pdf to be generated"
