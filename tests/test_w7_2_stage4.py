@@ -15,7 +15,7 @@ from main import app
 async def test_stage4_api_pipeline():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # 1. POST /reports generates a new report
-        res_post = await ac.post("/reports")
+        res_post = await ac.post("/reports", json={"force": True})
         assert res_post.status_code == 201
         data_post = res_post.json()
         assert "id" in data_post

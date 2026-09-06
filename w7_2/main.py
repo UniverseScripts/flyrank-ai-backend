@@ -1,8 +1,9 @@
 import datetime
 from pathlib import Path
+from typing import Optional
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from playwright.async_api import async_playwright
@@ -10,6 +11,7 @@ from playwright.async_api import async_playwright
 from db.config import create_tables, dispose_engine, get_db_session
 from models import Books, Reports
 from render_pdf import render_pdf_report
+from schemas.report_requests import ReportRequest
 
 
 VERSION = "v1"
@@ -43,7 +45,18 @@ async def health():
 
 @app.post("/reports", status_code=201)
 @app.post(f"/{VERSION}/reports", status_code=201)
-async def generate_report(db: AsyncSession = Depends(get_db_session)):
+async def generate_report(response: Response, body: Optional[ReportRequest] = None, db: AsyncSession = Depends(get_db_session)):
+    if not (body and body.force):
+        try:
+            stmt = select(Reports).order_by(Reports.id.desc()).limit(1)
+            report_exist = await db.execute(stmt)
+            result = report_exist.scalar_one_or_none()
+            if result and result.created_at.date() == datetime.date.today():
+                response.status_code = status.HTTP_200_OK
+                return {"id": result.id, "file": f"/reports/{result.id}/file"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     try:
         # fetch all books, avg_price
         stmt = select(Books)
