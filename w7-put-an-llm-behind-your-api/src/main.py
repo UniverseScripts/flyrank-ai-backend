@@ -4,13 +4,12 @@ import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status
 from openai import OpenAI, APITimeoutError
-from pathlib import Path
-from w7.config import settings
-from w7.src.schemas import (
+from config import settings
+from src.schemas import (
     ClassifySupportMessageRequest,
     ClassifySupportMessageResponse,
 )
-from w7.src.helpers import write_log, model_call
+from src.helpers import write_log, model_call
 
 VERSION = "1.0.0"
 

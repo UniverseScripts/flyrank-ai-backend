@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 from sqlalchemy import func, select
 
-# Add workspace and w7_2 directory to sys.path
-W7_2_DIR = Path(__file__).resolve().parent.parent / "w7_2"
+# Add workspace and w7-pdf-report-generator directory to sys.path
+W7_2_DIR = Path(__file__).resolve().parent.parent / "w7-pdf-report-generator"
 if str(W7_2_DIR) not in sys.path:
     sys.path.insert(0, str(W7_2_DIR))
 

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import sys
 
-W7_2_DIR = Path(__file__).resolve().parent.parent / "w7_2"
+W7_2_DIR = Path(__file__).resolve().parent.parent / "w7-pdf-report-generator"
 if str(W7_2_DIR) not in sys.path:
     sys.path.insert(0, str(W7_2_DIR))
 

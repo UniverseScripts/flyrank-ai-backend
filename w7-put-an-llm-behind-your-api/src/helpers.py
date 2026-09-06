@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from openai import OpenAI, APITimeoutError, AuthenticationError, PermissionDeniedError
 from fastapi import HTTPException, status
-from w7.config import settings
+from config import settings
 
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "support_classifier_v1.md"
 PROMPT_VERSION="1.0.0"

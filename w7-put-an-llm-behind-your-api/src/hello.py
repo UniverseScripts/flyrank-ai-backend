@@ -1,5 +1,5 @@
 from openai import OpenAI
-from w7.config import settings
+from config import settings
 
 
 client = OpenAI(

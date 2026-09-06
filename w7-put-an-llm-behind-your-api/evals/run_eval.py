@@ -2,7 +2,7 @@ import json
 import time
 from pathlib import Path
 from fastapi.testclient import TestClient
-from w7.src.main import app
+from src.main import app
 
 CASES_PATH = Path(__file__).resolve().parent / "cases.json"
 

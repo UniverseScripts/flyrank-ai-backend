@@ -2,9 +2,16 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from w3.db_engine import create_tables
-from w3.helpers.seed_3 import seed_3_examples
-from w3.main import app
+import sys
+from pathlib import Path
+
+W3_DIR = Path(__file__).resolve().parent.parent / "w3-connecting-crud-to-database"
+if str(W3_DIR) not in sys.path:
+    sys.path.insert(0, str(W3_DIR))
+
+from db_engine import create_tables
+from helpers.seed_3 import seed_3_examples
+from main import app
 
 
 @pytest_asyncio.fixture(autouse=True)

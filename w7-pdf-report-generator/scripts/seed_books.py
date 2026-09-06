@@ -8,7 +8,9 @@ async def seed_books():
     await create_tables()
 
     # get path of the json file
-    json_file = Path(__file__).parent.parent.parent / "w5" / "output" / "books.json"
+    json_file = Path(__file__).parent.parent.parent / "w5-the-polite-scraper" / "output" / "books.json"
+    if not json_file.exists():
+        json_file = Path(__file__).parent.parent.parent / "w5" / "output" / "books.json"
 
     with open(json_file, "r", encoding="utf-8") as f:
         books = json.load(f)
