@@ -12,6 +12,7 @@ A comprehensive backend engineering portfolio featuring asynchronous REST APIs, 
 | **Week 3** (A2 & A3) | [**Connecting CRUD to Database**](./w3-connecting-crud-to-database/README.md) | SQLAlchemy 2.0 AsyncIO, SQLite (`aiosqlite`), PostgreSQL, Docker Compose | Serverless SQLite persistence migrated to containerized PostgreSQL orchestrated via Docker Compose. |
 | **Week 4** (A4) | [**Auth · Login & Protect**](./w4-auth-login-and-protect/README.md) | Supabase Auth, JWT, FastAPI Security | External IdP authentication, cryptographic JWT bearer token verification middleware, protected route dependencies. |
 | **Week 5** (A9) | [**The Polite Scraper**](./w5-the-polite-scraper/README.md) | Requests, BeautifulSoup4, Pydantic v2 | Respectful web scraping pipeline with honest User-Agent headers, rate limiting, local disk caching, and execution telemetry. |
+| **Week 6** (A7) | [**Your First Background Job**](./w6-first-background-job/README.md) | Inngest, FastAPI, Uvicorn | Durable background jobs, step execution (`step.sleep`, `step.run`), and event-driven workflow engine. |
 | **Week 7** (A17) | [**Put an LLM Behind Your API**](./w7-put-an-llm-behind-your-api/README.md) | OpenAI SDK, Pydantic v2, OpenRouter / Ollama | Support ticket classifier with strict structured output, provider abstraction, automated repair retries, and token cost telemetry. |
 | **Week 7** (A8) | [**PDF Report Generator**](./w7-pdf-report-generator/README.md) | Playwright, SQLAlchemy AsyncIO, Jinja2, SQLite | Multi-page PDF generation pipeline with SQL aggregations, CSS print page-breaks, caching, and idempotency protection. |
 
@@ -38,6 +39,7 @@ Sensitive credentials and configuration parameters are loaded via environment fi
 ├── w3-connecting-crud-to-database/ # Database persistence (SQLite + Docker Compose PostgreSQL)
 ├── w4-auth-login-and-protect/      # Supabase Auth & JWT middleware
 ├── w5-the-polite-scraper/          # Polite web scraping pipeline & telemetry
+├── w6-first-background-job/        # Inngest background job & workflow engine
 ├── w7-put-an-llm-behind-your-api/  # Support ticket classifier with LLM abstraction
 ├── w7-pdf-report-generator/        # Database-driven PDF report generator
 ├── tests/                          # Automated integration and regression test suites
