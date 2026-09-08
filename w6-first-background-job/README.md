@@ -45,11 +45,23 @@ npx inngest-cli@latest dev -u http://localhost:8000/api/inngest
 - Trigger Event: `test/hello`
 - Workflow: Sleeps 5 seconds (`ctx.step.sleep("sleep-for-5s", datetime.timedelta(seconds=5))`) then returns `"Hello from the background!"`.
 
+### Stage 2: The Fast Door: Accept Now, Work Later
+- **Endpoints**:
+  - `POST /reports` $\to$ Returns HTTP `202 Accepted` with `{"id": "<uuid>", "status": "pending"}` in < 1 second.
+  - `GET /reports/{id}` $\to$ Returns current status (`pending`, then `done` with `"result"`). Returns `404` for unknown IDs.
+- **Workflow**: `make-report` function triggered by `report/requested`.
+  - Step 1: `ctx.step.sleep("do-the-slow-work", datetime.timedelta(seconds=8))` (simulates slow task).
+  - Step 2: `ctx.step.run("build-report", handler)` (compiles summary and sets status to `"done"`).
+
 ---
 
 ## Verification & Automated Tests
 
-Run the Stage 1 test suite:
+Run the test suites:
 ```bash
+# Stage 1: Inngest setup & say-hello
 uv run pytest ../tests/test_w6_stage1.py -v
+
+# Stage 2: 202 Accepted, background make-report workflow, and status polling
+uv run pytest ../tests/test_w6_stage2.py -v
 ```

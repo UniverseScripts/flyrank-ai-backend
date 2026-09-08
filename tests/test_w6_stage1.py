@@ -23,14 +23,21 @@ async def test_health_endpoint():
         assert res.json() == {"status": "ok"}
 
 
+from unittest.mock import AsyncMock, patch
+import httpx
+import inngest._internal.net as inngest_net
+
+
 @pytest.mark.asyncio
 async def test_inngest_registration_put():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        res = await ac.put("/api/inngest")
-        assert res.status_code == 200
-        data = res.json()
-        # Inngest registration sync responds with modified status
-        assert "modified" in data
+    fake_res = httpx.Response(200, json={"status": 200, "modified": True})
+    with patch.object(inngest_net, "fetch_with_thready_safety", new_callable=AsyncMock) as mock_fetch:
+        mock_fetch.return_value = fake_res
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            res = await ac.put("/api/inngest")
+            assert res.status_code == 200
+            data = res.json()
+            assert "modified" in data
 
 
 @pytest.mark.asyncio
