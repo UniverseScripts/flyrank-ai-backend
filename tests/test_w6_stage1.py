@@ -9,7 +9,7 @@ if str(W6_DIR) not in sys.path:
     sys.path.insert(0, str(W6_DIR))
 
 for mod in list(sys.modules.keys()):
-    if mod in ("settings", "settings.config", "main"):
+    if mod in ("settings", "settings.config", "main", "schemas", "schemas.reports"):
         del sys.modules[mod]
 
 from main import app, inngest_client
