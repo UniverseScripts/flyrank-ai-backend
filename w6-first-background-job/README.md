@@ -53,6 +53,15 @@ npx inngest-cli@latest dev -u http://localhost:8000/api/inngest
   - Step 1: `ctx.step.sleep("do-the-slow-work", datetime.timedelta(seconds=8))` (simulates slow task).
   - Step 2: `ctx.step.run("build-report", handler)` (compiles summary and sets status to `"done"`).
 
+### Stage 3: Jobs Fail. Watch the Retry.
+- **Durable Failure Handling & Memoization**:
+  - `make-report` configured with `retries=2`.
+  - Injected failure: If `topic == "fail"`, `build-report` raises `ValueError("The report oven is broken!")`.
+  - Because `do-the-slow-work` is a distinct Inngest step, its result is memoized. On retry attempts (1 initial + 2 retries = 3 attempts total), Inngest skips the 8-second wait and immediately retries the failing `build-report` step before marking the run `Failed`.
+- **Bad Input vs. Bad Luck (Architectural Reflection)**:
+  - Missing or empty topic inputs are rejected immediately at the endpoint with `HTTP 400 Bad Request` without dispatching an event to Inngest or creating a pending report.
+  > *"A wrong input must be rejected at the door with HTTP 400 because bad data will never succeed on a retry; only transient failures occurring at a wrong moment deserve automated retries with backoff."*
+
 ---
 
 ## Verification & Automated Tests
@@ -64,4 +73,11 @@ uv run pytest ../tests/test_w6_stage1.py -v
 
 # Stage 2: 202 Accepted, background make-report workflow, and status polling
 uv run pytest ../tests/test_w6_stage2.py -v
+
+# Stage 3: Retries, failure memoization, and 400 validation rejection
+uv run pytest ../tests/test_w6_stage3.py -v
+
+# Run all test suites
+uv run pytest ../tests/test_w6_stage*.py -v
 ```
+

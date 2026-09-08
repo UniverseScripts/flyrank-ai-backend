@@ -3,9 +3,11 @@ import datetime
 import inngest.fast_api
 import uuid
 from fastapi import FastAPI, HTTPException, status
+from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 from settings.config import settings
 from schemas.reports import ReportRequest
+from handlers import validation_exception_handler
 
 inngest_client = inngest.Inngest(
     app_id="report-api",
@@ -33,6 +35,7 @@ app = FastAPI(
     lifespan=lifespan, version="0.0.1", title="W6 First Background Job",
     description="A simple FastAPI application with Inngest integration"
 )
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.state.reports_map: dict[str, dict] = {}
 
 @app.get("/health", tags=["health"])
@@ -43,6 +46,8 @@ async def health_check():
 
 @app.post("/reports", status_code=202)
 async def request_report(request: ReportRequest):
+    if not request.topic or not request.topic.strip():
+        raise HTTPException(status_code=400, detail="Missing topic")
     report_id = str(uuid.uuid4())
     app.state.reports_map[report_id] = {"id": report_id, "topic": request.topic, "status": "pending"}
     await inngest_client.send(
@@ -59,12 +64,18 @@ async def request_report(request: ReportRequest):
 @inngest_client.create_function(
     fn_id="make-report",
     trigger=inngest.TriggerEvent(event="report/requested"),
+    retries=2
 )
 async def make_report(ctx: inngest.Context):
     await ctx.step.sleep(step_id="do-the-slow-work", duration=datetime.timedelta(seconds=8))
+    
+    
     def build_report():
         report_id = ctx.event.data["id"]
         report_topic = ctx.event.data["topic"]
+
+        if report_topic == "fail":
+            raise ValueError("The report oven is broken!")
 
         result = f"Summary report for topic: {report_topic}"
 
