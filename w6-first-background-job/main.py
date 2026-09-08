@@ -75,6 +75,7 @@ async def make_report(ctx: inngest.Context):
         report_topic = ctx.event.data["topic"]
 
         if report_topic == "fail":
+            app.state.reports_map[report_id]["status"] = "failed"
             raise ValueError("The report oven is broken!")
 
         result = f"Summary report for topic: {report_topic}"
@@ -93,7 +94,21 @@ async def get_report(id: str):
     return app.state.reports_map[id]
 
 
-inngest.fast_api.serve(app=app, client=inngest_client, functions=[say_hello, make_report])
+@inngest_client.create_function(
+    fn_id="heartbeat",
+    trigger=inngest.TriggerCron(cron="* * * * *"),
+)
+async def heartbeat(ctx: inngest.Context):
+    pending_reports = sum(1 for report in app.state.reports_map.values() if report["status"] == "pending")
+    done_reports = sum(1 for report in app.state.reports_map.values() if report["status"] == "done")
+    failed_reports = sum(1 for report in app.state.reports_map.values() if report["status"] == "failed")
+    
+    summary = f"Heartbeat: {pending_reports} pending, {done_reports} done, {failed_reports} failed"
+    print(summary)
+    return summary
+
+
+inngest.fast_api.serve(app=app, client=inngest_client, functions=[say_hello, make_report, heartbeat])
 
 if __name__ == "__main__":
     import uvicorn
