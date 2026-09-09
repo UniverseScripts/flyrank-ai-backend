@@ -23,7 +23,13 @@ export type StepRunner = {
   ) => Promise<DecisionStepResult>;
 };
 
-export type WalkInput = { runId: string; input: string; graph: FlowGraph };
+export type WalkInput = {
+  runId: string;
+  input: string;
+  graph: FlowGraph;
+  /** Resume from this node instead of the graph start, for retrying a failure. */
+  startNodeId?: string | null;
+};
 export type WalkOutcome = {
   runId: string;
   status: "done" | "failed";
@@ -40,7 +46,7 @@ export type WalkOutcome = {
  * memoisation machinery is not ours to re-verify.
  */
 export async function walkFlow(
-  { runId, input, graph }: WalkInput,
+  { runId, input, graph, startNodeId }: WalkInput,
   step: StepRunner
 ): Promise<WalkOutcome> {
   const validation = validateGraph(graph);
@@ -50,7 +56,9 @@ export async function walkFlow(
   }
 
   const trace: TraceEntry[] = [];
-  let currentId = findStartNodeId(graph);
+  // A retry resumes at the node that failed; a fresh run starts at the root.
+  let currentId =
+    startNodeId && nodeById(graph, startNodeId) ? startNodeId : findStartNodeId(graph);
   let stepIndex = 0;
 
   updateRun(runId, { status: "running", currentNodeId: currentId });

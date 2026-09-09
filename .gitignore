@@ -12,3 +12,18 @@ w5/cache/
 reports.db
 reports/
 **/reports/**
+task.txt
+
+# Claude workspace (never pushed)
+.claude/
+CLAUDE.md
+
+# Node / Next.js
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+test-results/
+playwright-report/
+AGENTS.md
+commit-commands.txt

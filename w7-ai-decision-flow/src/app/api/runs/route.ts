@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { inngest } from "@/lib/inngest/client";
 import { flowRunRequested } from "@/lib/inngest/events";
 import { validateGraph } from "@/lib/graph/validate";
-import { createRun, deleteRun } from "@/lib/store/runs";
+import { createRun, deleteRun, listRuns } from "@/lib/store/runs";
 import type { FlowGraph } from "@/lib/graph/types";
 
 /**
@@ -11,7 +11,7 @@ import type { FlowGraph } from "@/lib/graph/types";
  * node, which is far too long to hold a request open.
  */
 export async function POST(request: NextRequest) {
-  let body: { graph?: FlowGraph; input?: string };
+  let body: { graph?: FlowGraph; input?: string; startNodeId?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -35,7 +35,9 @@ export async function POST(request: NextRequest) {
   createRun(runId, input);
 
   try {
-    await inngest.send(flowRunRequested.create({ runId, input, graph }));
+    const startNodeId =
+      typeof body.startNodeId === "string" ? body.startNodeId : null;
+    await inngest.send(flowRunRequested.create({ runId, input, graph, startNodeId }));
   } catch (err) {
     // The run exists in the store but nothing will ever advance it. Drop it
     // rather than leave a "pending" row the client polls forever.
@@ -51,4 +53,19 @@ export async function POST(request: NextRequest) {
   }
 
   return Response.json({ id: runId, status: "pending" }, { status: 202 });
+}
+
+/** Recent runs, newest first — the execution history the UI lists. */
+export async function GET() {
+  const runs = listRuns()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 20)
+    .map(({ id, status, input, createdAt, trace }) => ({
+      id,
+      status,
+      input,
+      createdAt,
+      steps: trace.length,
+    }));
+  return Response.json({ runs });
 }

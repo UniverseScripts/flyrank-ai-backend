@@ -12,5 +12,10 @@ export const flowPing = eventType("flow/ping", {
 // The graph travels with the event. It lives in the browser's localStorage,
 // so the server has no copy to look up.
 export const flowRunRequested = eventType("flow/run.requested", {
-  schema: staticSchema<{ runId: string; input: string; graph: FlowGraph }>(),
+  schema: staticSchema<{
+    runId: string;
+    input: string;
+    graph: FlowGraph;
+    startNodeId?: string | null;
+  }>(),
 });

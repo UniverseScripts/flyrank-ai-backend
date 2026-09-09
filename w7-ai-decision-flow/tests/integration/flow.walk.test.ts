@@ -102,6 +102,40 @@ describe("step ids", () => {
   });
 });
 
+describe("resuming a failed run", () => {
+  it("starts from the given node instead of the graph root", async () => {
+    // Retrying a failure must not re-ask, and re-pay for, the nodes that
+    // already answered.
+    const graph: FlowGraph = {
+      nodes: [node("a", "root"), node("b", "middle"), node("c", "leaf [stub:NO]")],
+      edges: [edge("a", "b", "YES"), edge("b", "c", "YES")],
+    };
+    createRun("run-resume", "");
+
+    const outcome = await walkFlow(
+      { runId: "run-resume", input: "", graph, startNodeId: "b" },
+      recordingStep().step
+    );
+
+    expect(outcome.trace.map((t) => t.nodeId)).toEqual(["b", "c"]);
+  });
+
+  it("falls back to the root when the named node is gone", async () => {
+    const graph: FlowGraph = {
+      nodes: [node("a", "root [stub:NO]")],
+      edges: [],
+    };
+    createRun("run-resume-missing", "");
+
+    const outcome = await walkFlow(
+      { runId: "run-resume-missing", input: "", graph, startNodeId: "deleted" },
+      recordingStep().step
+    );
+
+    expect(outcome.trace.map((t) => t.nodeId)).toEqual(["a"]);
+  });
+});
+
 describe("guards", () => {
   it("stops a looping graph instead of walking forever", async () => {
     const graph: FlowGraph = {

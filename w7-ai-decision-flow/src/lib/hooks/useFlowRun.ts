@@ -6,11 +6,23 @@ import type { Run } from "@/lib/store/runs";
 
 const POLL_MS = 600;
 
+export type RunSummary = {
+  id: string;
+  status: Run["status"];
+  input: string;
+  createdAt: string;
+  steps: number;
+};
+
+export type StartOptions = { startNodeId?: string | null };
+
 export type UseFlowRun = {
   run: Run | null;
+  history: RunSummary[];
   error: string | null;
   isBusy: boolean;
-  start: (graph: FlowGraph, input: string) => Promise<void>;
+  start: (graph: FlowGraph, input: string, options?: StartOptions) => Promise<void>;
+  select: (id: string) => Promise<void>;
   reset: () => void;
 };
 
@@ -21,6 +33,7 @@ export type UseFlowRun = {
  */
 export function useFlowRun(): UseFlowRun {
   const [run, setRun] = useState<Run | null>(null);
+  const [history, setHistory] = useState<RunSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,6 +46,15 @@ export function useFlowRun(): UseFlowRun {
   // A run left in flight when the component goes away would keep polling.
   useEffect(() => stopPolling, [stopPolling]);
 
+  const refreshHistory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/runs");
+      if (res.ok) setHistory((await res.json()).runs ?? []);
+    } catch {
+      // History is a convenience; failing to load it must not break a run.
+    }
+  }, []);
+
   const poll = useCallback(
     async (id: string) => {
       try {
@@ -43,6 +65,7 @@ export function useFlowRun(): UseFlowRun {
 
         if (next.status === "done" || next.status === "failed") {
           setIsBusy(false);
+          void refreshHistory();
           return;
         }
         timer.current = setTimeout(() => void poll(id), POLL_MS);
@@ -51,11 +74,11 @@ export function useFlowRun(): UseFlowRun {
         setIsBusy(false);
       }
     },
-    []
+    [refreshHistory]
   );
 
   const start = useCallback(
-    async (graph: FlowGraph, input: string) => {
+    async (graph: FlowGraph, input: string, options: StartOptions = {}) => {
       stopPolling();
       setError(null);
       setRun(null);
@@ -65,7 +88,7 @@ export function useFlowRun(): UseFlowRun {
         const res = await fetch("/api/runs", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ graph, input }),
+          body: JSON.stringify({ graph, input, startNodeId: options.startNodeId ?? null }),
         });
         const body = await res.json();
 
@@ -83,6 +106,22 @@ export function useFlowRun(): UseFlowRun {
     [poll, stopPolling]
   );
 
+  /** Show a finished run from history without re-running it. */
+  const select = useCallback(
+    async (id: string) => {
+      stopPolling();
+      setError(null);
+      try {
+        const res = await fetch(`/api/runs/${id}`);
+        if (!res.ok) throw new Error(`Run lookup failed (${res.status})`);
+        setRun(await res.json());
+      } catch (err) {
+        setError((err as Error).message);
+      }
+    },
+    [stopPolling]
+  );
+
   const reset = useCallback(() => {
     stopPolling();
     setRun(null);
@@ -90,5 +129,9 @@ export function useFlowRun(): UseFlowRun {
     setIsBusy(false);
   }, [stopPolling]);
 
-  return { run, error, isBusy, start, reset };
+  useEffect(() => {
+    void refreshHistory();
+  }, [refreshHistory]);
+
+  return { run, history, error, isBusy, start, select, reset };
 }

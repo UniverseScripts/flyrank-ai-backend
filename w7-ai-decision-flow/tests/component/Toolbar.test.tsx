@@ -13,6 +13,8 @@ const props = {
   onAddNode: () => {},
   onClear: () => {},
   onRun: () => {},
+  onExport: () => {},
+  onImport: () => {},
 };
 
 describe("Toolbar", () => {
@@ -55,6 +57,19 @@ describe("Toolbar", () => {
 
     await userEvent.type(screen.getByTestId("run-input"), "hi");
     expect(onInputChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("exports and imports", async () => {
+    const onExport = vi.fn();
+    const onImport = vi.fn();
+    render(<Toolbar {...props} onExport={onExport} onImport={onImport} />);
+
+    await userEvent.click(screen.getByTestId("export-graph"));
+    expect(onExport).toHaveBeenCalledOnce();
+
+    const file = new File(['{\"version\":1}'], "flow.json", { type: "application/json" });
+    await userEvent.upload(screen.getByTestId("import-file"), file);
+    expect(onImport).toHaveBeenCalledWith(file);
   });
 
   describe("the Run button", () => {

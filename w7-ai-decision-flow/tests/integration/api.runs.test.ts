@@ -8,7 +8,7 @@ import type { FlowGraph } from "@/lib/graph/types";
 const send = vi.fn();
 vi.mock("@/lib/inngest/client", () => ({ inngest: { send: (...a: unknown[]) => send(...a) } }));
 
-const { POST } = await import("@/app/api/runs/route");
+const { POST, GET: LIST } = await import("@/app/api/runs/route");
 const { GET } = await import("@/app/api/runs/[id]/route");
 
 const post = (body: unknown) =>
@@ -72,6 +72,23 @@ describe("POST /api/runs", () => {
     expect(res.status).toBe(502);
     expect((await res.json()).error).toMatch(/Inngest Dev Server/);
     expect(listRuns()).toHaveLength(0);
+  });
+});
+
+describe("GET /api/runs (history)", () => {
+  it("lists runs newest first with their step counts", async () => {
+    createRun("older", "first");
+    await new Promise((r) => setTimeout(r, 5));
+    createRun("newer", "second");
+
+    const body = await (await LIST()).json();
+
+    expect(body.runs.map((r: { id: string }) => r.id)).toEqual(["newer", "older"]);
+    expect(body.runs[0]).toMatchObject({ status: "pending", input: "second", steps: 0 });
+  });
+
+  it("is empty when nothing has run", async () => {
+    expect((await (await LIST()).json()).runs).toEqual([]);
   });
 });
 

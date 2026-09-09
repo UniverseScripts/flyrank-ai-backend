@@ -4,7 +4,7 @@
 > strictly `YES` or `NO`. Execution runs durably through Inngest; the canvas
 > visualises the path the run actually took.
 
-**Status: Phase 3 (Build — core) complete.**
+**Status: complete — all four phases.**
 
 ---
 
@@ -111,6 +111,23 @@ and `NO` in ~1.2 s with `finish_reason: stop`.
 
 Free-tier models rate-limit readily. A run that hits `429` on every attempt
 ends `failed` with the reason shown in the trace; a paid model removes the limit.
+
+## Polish
+
+The brief asks for at least three of the polish menu; five are implemented.
+
+| Feature | Behaviour |
+|---|---|
+| **Visual execution state** | Each node carries `data-exec-state`: `running` (amber, pulsing), `yes` (green), `no` (red), `failed`, `idle`. A node the run never reached stays idle, which is how you see the path it did *not* take. |
+| **Animated active edges** | Only the edges the run actually travelled animate and thicken. |
+| **Execution logs panel** | Per step: order, node, decision, duration, a `repaired` flag when a repair attempt was needed, and the failure reason. Total wall time in the header. |
+| **JSON export / import** | Export downloads `decision-flow.json`; import validates before touching the canvas, so a bad file shows an error and leaves the graph alone. |
+| **Retry failed nodes** | A failed run offers *Retry from failed node*, which resumes at the node that failed rather than re-asking — and re-paying for — the nodes that already answered. |
+| **Execution history** | The last 20 runs, newest first. Selecting one restores its trace without re-running it. |
+
+Execution state is derived from the run and passed to nodes through React
+context, never written into `node.data` — otherwise it would be serialised into
+localStorage and into every exported file.
 
 ## Endpoints
 
@@ -279,6 +296,46 @@ the traversal is decided by the model, not by the graph author.
 
 ---
 
+## Phase 4 proof
+
+`npm test` — the full pyramid, 119 tests:
+
+```text
+> next typegen && tsc --noEmit
+> vitest run tests/unit          47 passed
+> vitest run tests/integration   27 passed
+> vitest run tests/component     27 passed
+> playwright test                18 passed
+```
+
+Driven in Chrome against a running Inngest Dev Server, one graph, node 1
+answering NO:
+
+```text
+graph: 3 nodes · 2 edges | Runnable
+run -> Finished | states {"1":"no","2":"idle","3":"yes"} | animated 1
+history entries: 2
+```
+
+Node 2 sits on the YES branch and stays `idle` — the canvas shows the path the
+run did not take as clearly as the one it did — and exactly one edge animates.
+
+### A note on the free tier
+
+`google/gemma-4-26b-a4b-it:free` runs through Google AI Studio's shared free
+pool. Under load it returns `429` with
+`limit_source: upstream_provider_shared_pool`. That is handled rather than
+hidden: the 429 becomes an Inngest `RetryAfterError("60s")`, and if every
+attempt is refused the run ends `failed` with the reason in the trace. A
+run that hits it therefore takes about two minutes to give up.
+
+Screenshots above were captured with `LLM_STUB=1`, which renders identically —
+only the branch decisions are scripted instead of asked. The live OpenRouter
+evidence is in the Phase 3 proof. To remove the limit, use a paid model or add
+your own Google AI Studio key to OpenRouter.
+
+---
+
 ## Roadmap
 
 | Phase | Scope | Test levels added |
@@ -286,4 +343,4 @@ the traversal is decided by the model, not by the graph author.
 | 1 · Setup | ✅ App, Inngest bridge, env, structure | smoke |
 | 2 · Foundations | ✅ Canvas, add/connect nodes, edit prompts, YES/NO edges, local persistence | unit, component |
 | 3 · Core | ✅ Node → Inngest step, LLM decision, branch, execution order | integration, E2E |
-| 4 · Polish | Execution state, logs panel, JSON import/export, animated edges, retry | full pyramid |
+| 4 · Polish | ✅ Execution state, logs panel, JSON import/export, animated edges, retry, history | full pyramid |

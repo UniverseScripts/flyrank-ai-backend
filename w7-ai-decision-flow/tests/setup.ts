@@ -27,6 +27,10 @@ if (typeof globalThis.HTMLElement !== "undefined") {
     offsetWidth: { get() { return Number.parseFloat(this.style.width) || 1; } },
   });
 
+  // ScrollArea polls getAnimations() on a timer; jsdom has no Web Animations.
+  (globalThis.Element.prototype as unknown as { getAnimations: () => Animation[] }).getAnimations =
+    () => [];
+
   (globalThis.SVGElement.prototype as unknown as { getBBox: () => DOMRect }).getBBox = () =>
     ({ x: 0, y: 0, width: 0, height: 0 }) as DOMRect;
 }

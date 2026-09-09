@@ -16,10 +16,14 @@ import "@xyflow/react/dist/style.css";
 
 import { Toolbar } from "@/components/flow/Toolbar";
 import { RunTrace } from "@/components/flow/RunTrace";
-import { useFlowRun } from "@/lib/hooks/useFlowRun";
+import { RunHistory } from "@/components/flow/RunHistory";
+import { ExecutionProvider } from "@/components/flow/ExecutionContext";
 import { nodeTypes } from "@/components/flow/DecisionNode";
+import { useFlowRun } from "@/lib/hooks/useFlowRun";
+import { activeEdgeIds, failedNodeId, nodeStates } from "@/lib/flow/executionState";
 import { createDecisionNode } from "@/lib/graph/factory";
 import { branchOf } from "@/lib/graph/traverse";
+import { fromJSON, toJSON } from "@/lib/graph/serialize";
 import { validateGraph } from "@/lib/graph/validate";
 import type { DecisionNode } from "@/lib/graph/types";
 import { loadGraph, saveGraph, clearGraph } from "@/lib/store/graph";
@@ -29,6 +33,10 @@ const BRANCH_COLOR: Record<string, string> = { YES: "#10b981", NO: "#f43f5e" };
 function Canvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<DecisionNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [input, setInput] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const { run, history, error: runError, isBusy, start, select } = useFlowRun();
 
   // Hydrate from localStorage after mount. Reading during render would make the
   // server and client markup disagree.
@@ -73,6 +81,7 @@ function Canvas() {
     setNodes([]);
     setEdges([]);
     clearGraph();
+    setImportError(null);
     nextId.current = 1;
   }, [setNodes, setEdges]);
 
@@ -81,11 +90,7 @@ function Canvas() {
       const branch = connection.sourceHandle ?? "";
       setEdges((current) =>
         addEdge(
-          {
-            ...connection,
-            label: branch,
-            style: { stroke: BRANCH_COLOR[branch] },
-          },
+          { ...connection, label: branch, style: { stroke: BRANCH_COLOR[branch] } },
           current
         )
       );
@@ -104,13 +109,47 @@ function Canvas() {
     [edges]
   );
 
-  const [input, setInput] = useState("");
-  const { run, error: runError, isBusy, start } = useFlowRun();
+  const onExport = useCallback(() => {
+    const blob = new Blob([toJSON({ nodes, edges })], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "decision-flow.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [nodes, edges]);
+
+  const onImport = useCallback(
+    async (file: File) => {
+      const parsed = fromJSON(await file.text());
+      if (!parsed.ok) {
+        setImportError(parsed.errors.join(" "));
+        return;
+      }
+      setImportError(null);
+      setNodes(parsed.graph.nodes);
+      setEdges(parsed.graph.edges);
+    },
+    [setNodes, setEdges]
+  );
 
   const errors = useMemo(() => {
     const result = validateGraph({ nodes, edges });
     return result.ok ? [] : result.errors;
   }, [nodes, edges]);
+
+  const execStates = useMemo(() => nodeStates(run), [run]);
+  const retryFrom = useMemo(() => failedNodeId(run), [run]);
+
+  // Only the edges the run actually travelled animate.
+  const displayEdges = useMemo(() => {
+    const active = activeEdgeIds({ nodes, edges }, run);
+    return edges.map((edge) =>
+      active.has(edge.id)
+        ? { ...edge, animated: true, style: { ...edge.style, strokeWidth: 3 } }
+        : edge
+    );
+  }, [nodes, edges, run]);
 
   return (
     <div className="flex h-full flex-col" data-testid="flow-canvas">
@@ -124,27 +163,46 @@ function Canvas() {
         onAddNode={onAddNode}
         onClear={onClear}
         onRun={() => void start({ nodes, edges }, input)}
+        onExport={onExport}
+        onImport={(file) => void onImport(file)}
       />
+
+      {importError ? (
+        <p className="border-b bg-destructive/10 px-4 py-1.5 text-xs text-destructive" data-testid="import-error">
+          {importError}
+        </p>
+      ) : null}
+
       <div className="flex-1">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          isValidConnection={isValidConnection}
-          fitView
-          // Without a cap, fitView zooms a small graph to 2x and pushes later
-          // nodes off screen.
-          fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
-          minZoom={0.2}
-        >
-          <Background />
-          <Controls />
-        </ReactFlow>
+        <ExecutionProvider value={execStates}>
+          <ReactFlow
+            nodes={nodes}
+            edges={displayEdges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            isValidConnection={isValidConnection}
+            fitView
+            // Without a cap, fitView zooms a small graph to 2x and pushes later
+            // nodes off screen.
+            fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
+            minZoom={0.2}
+          >
+            <Background />
+            <Controls />
+          </ReactFlow>
+        </ExecutionProvider>
       </div>
-      <RunTrace run={run} error={runError} />
+
+      <RunTrace
+        run={run}
+        error={runError}
+        canRetry={retryFrom !== null}
+        isBusy={isBusy}
+        onRetry={() => void start({ nodes, edges }, input, { startNodeId: retryFrom })}
+      />
+      <RunHistory runs={history} activeId={run?.id ?? null} onSelect={(id) => void select(id)} />
     </div>
   );
 }
